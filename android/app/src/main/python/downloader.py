@@ -13,11 +13,24 @@ from urllib.parse import urlparse
 import requests
 import yt_dlp
 
-# User-Agent estandarizado de Android/Chrome para evitar bloqueos 403 en móviles
+# User-Agent estandarizado de Android/Chrome para móviles
 MOBILE_USER_AGENT = (
     "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko)"
     " Chrome/120.0.0.0 Mobile Safari/537.36"
 )
+
+# Cabeceras HTTP avanzadas para imitar un navegador real y evitar bloqueos 403
+ADVANCED_HEADERS = {
+    "User-Agent": MOBILE_USER_AGENT,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "es-ES,es;q=0.9,en;S;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+}
 
 # ----------------------------------------------------------------------------
 # EXTRACTOR CUSTOM: mismo que el original pero adaptado para móvil
@@ -27,7 +40,7 @@ MOBILE_USER_AGENT = (
 def extract_pimpbunny_com(page_url):
   headers = {
       "Referer": page_url,
-      "User-Agent": MOBILE_USER_AGENT,
+      **ADVANCED_HEADERS,
   }
   resp = requests.get(page_url, headers=headers, timeout=15)
   resp.raise_for_status()
@@ -85,7 +98,7 @@ def probe_info(url):
   probe_opts = {
       "quiet": True,
       "skip_download": True,
-      "http_headers": {"User-Agent": MOBILE_USER_AGENT},
+      "http_headers": ADVANCED_HEADERS,
   }
   with yt_dlp.YoutubeDL(probe_opts) as ydl:
     info = ydl.extract_info(url, download=False)
@@ -167,7 +180,7 @@ def start_download(
       "nocheckcertificate": True,
       "concurrent_fragment_downloads": 4,
       "buffersize": 1024 * 64,
-      "http_headers": {"User-Agent": MOBILE_USER_AGENT},
+      "http_headers": ADVANCED_HEADERS,
   }
 
   try:
