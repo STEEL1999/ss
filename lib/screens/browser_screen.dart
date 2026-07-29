@@ -90,6 +90,13 @@ class _BrowserScreenState extends State<BrowserScreen> {
       return;
     }
 
+    // --- FILTRO DE SEGURIDAD PARA URLS BLOB DE YOUTUBE ---
+    if (_currentUrl.startsWith('blob:')) {
+      _showSnack('No se puede descargar un enlace blob temporal. Navega al video principal de YouTube.');
+      return;
+    }
+    // ----------------------------------------------------
+
     final domain = Uri.parse(_currentUrl).host.toLowerCase();
 
     // 1) Extractor custom (ej: pimpbunny.com)
@@ -171,9 +178,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
     final options = ['Mejor calidad', ...heights.map((h) => '${h}p')];
     final choice = await _promptChoice('Calidad', options);
     if (choice == null) return null;
-    // Usamos formatos ya combinados en un solo archivo ("best"), sin pedir
-    // bestvideo+bestaudio por separado: eso requeriría ffmpeg para unirlos,
-    // y no empaquetamos ffmpeg en la app (solo Python vía Chaquopy).
     if (choice == 'Mejor calidad') return 'best';
     final height = int.parse(choice.replaceAll('p', ''));
     return 'best[height<=$height]/best';
@@ -195,8 +199,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
   }
 
   // --------------------------------------------------------------------
-  // Manejo de la cola de descargas (equivalente a add_download_to_panel +
-  // start_async_download)
+  // Manejo de la cola de descargas
   // --------------------------------------------------------------------
   Future<void> _startDirectDownload(String url, String title) async {
     final id = const Uuid().v4();
@@ -209,10 +212,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
       _showDownloadPanel = true;
     });
 
-    // Muchos servidores de video (protección anti-hotlink/CDN) devuelven
-    // 403 si el pedido no trae Referer/User-Agent de un navegador real. El
-    // WebView los manda solo; nuestra descarga por Dio no, así que los
-    // agregamos a mano acá.
     final headers = {
       'Referer': _currentUrl,
       'User-Agent':
@@ -284,7 +283,6 @@ class _BrowserScreenState extends State<BrowserScreen> {
         }
       });
     } else {
-      // Descarga por yt-dlp
       setState(() {
         if (item.status == DownloadStatus.paused) {
           _ytdlp.resumeDownload(id);
@@ -326,71 +324,70 @@ class _BrowserScreenState extends State<BrowserScreen> {
         }
       },
       child: Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildNavBar(),
-            if (_isLoading) const LinearProgressIndicator(minHeight: 2),
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: _showDownloadPanel ? 3 : 1,
-                    child: InAppWebView(
-                      initialUrlRequest: URLRequest(
-                        url: WebUri(_urlController.text),
-                      ),
-                      initialSettings: InAppWebViewSettings(
-                        useShouldInterceptRequest: true,
-                        javaScriptEnabled: true,
-                        mediaPlaybackRequiresUserGesture: false,
-                      ),
-                      onWebViewCreated: (controller) {
-                        _webController = controller;
-                      },
-                      onLoadStart: (controller, url) {
-                        setState(() => _isLoading = true);
-                      },
-                      onLoadStop: (controller, url) async {
-                        final canGoBack = await controller.canGoBack();
-                        if (!mounted) return;
-                        setState(() {
-                          _isLoading = false;
-                          _currentUrl = url.toString();
-                          _urlController.text = _currentUrl;
-                          _canGoBack = canGoBack;
-                        });
-                      },
-                      // Equivalente a AdBlockInterceptor.interceptRequest
-                      shouldInterceptRequest: (controller, request) async {
-                        final uri = request.url;
-                        if (_adblock.shouldBlockRequest(uri)) {
-                          return WebResourceResponse(
-                            contentType: '',
-                            contentEncoding: '',
-                            data: Uint8List(0),
-                          );
-                        }
-                        return null; // dejar pasar la request normalmente
-                      },
-                    ),
-                  ),
-                  if (_showDownloadPanel)
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildNavBar(),
+              if (_isLoading) const LinearProgressIndicator(minHeight: 2),
+              Expanded(
+                child: Row(
+                  children: [
                     Expanded(
-                      flex: 1,
-                      child: DownloadPanel(
-                        downloads: _downloads.values.toList(),
-                        onPauseResume: _togglePauseResume,
-                        onCancel: _cancelDownload,
+                      flex: _showDownloadPanel ? 3 : 1,
+                      child: InAppWebView(
+                        initialUrlRequest: URLRequest(
+                          url: WebUri(_urlController.text),
+                        ),
+                        initialSettings: InAppWebViewSettings(
+                          useShouldInterceptRequest: true,
+                          javaScriptEnabled: true,
+                          mediaPlaybackRequiresUserGesture: false,
+                        ),
+                        onWebViewCreated: (controller) {
+                          _webController = controller;
+                        },
+                        onLoadStart: (controller, url) {
+                          setState(() => _isLoading = true);
+                        },
+                        onLoadStop: (controller, url) async {
+                          final canGoBack = await controller.canGoBack();
+                          if (!mounted) return;
+                          setState(() {
+                            _isLoading = false;
+                            _currentUrl = url.toString();
+                            _urlController.text = _currentUrl;
+                            _canGoBack = canGoBack;
+                          });
+                        },
+                        shouldInterceptRequest: (controller, request) async {
+                          final uri = request.url;
+                          if (_adblock.shouldBlockRequest(uri)) {
+                            return WebResourceResponse(
+                              contentType: '',
+                              contentEncoding: '',
+                              data: Uint8List(0),
+                            );
+                          }
+                          return null;
+                        },
                       ),
                     ),
-                ],
+                    if (_showDownloadPanel)
+                      Expanded(
+                        flex: 1,
+                        child: DownloadPanel(
+                          downloads: _downloads.values.toList(),
+                          onPauseResume: _togglePauseResume,
+                          onCancel: _cancelDownload,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 
