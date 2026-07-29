@@ -30,6 +30,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
   String _currentUrl = 'https://www.google.com';
   bool _showDownloadPanel = false;
   bool _isLoading = false;
+  bool _canGoBack = false;
 
   final Map<String, DownloadItem> _downloads = {};
   final Map<String, DirectDownloadService> _directServices = {};
@@ -170,9 +171,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
     final options = ['Mejor calidad', ...heights.map((h) => '${h}p')];
     final choice = await _promptChoice('Calidad', options);
     if (choice == null) return null;
-    if (choice == 'Mejor calidad') return 'bestvideo+bestaudio/best';
+    // Usamos formatos ya combinados en un solo archivo ("best"), sin pedir
+    // bestvideo+bestaudio por separado: eso requeriría ffmpeg para unirlos,
+    // y no empaquetamos ffmpeg en la app (solo Python vía Chaquopy).
+    if (choice == 'Mejor calidad') return 'best';
     final height = int.parse(choice.replaceAll('p', ''));
-    return 'bestvideo[height<=$height]+bestaudio/best[height<=$height]';
+    return 'best[height<=$height]/best';
   }
 
   Future<String?> _promptChoice(String title, List<String> options) {
@@ -302,7 +306,14 @@ class _BrowserScreenState extends State<BrowserScreen> {
   // --------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !_canGoBack,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _webController?.goBack();
+        }
+      },
+      child: Scaffold(
       body: SafeArea(
         child: Column(
           children: [
@@ -328,11 +339,14 @@ class _BrowserScreenState extends State<BrowserScreen> {
                       onLoadStart: (controller, url) {
                         setState(() => _isLoading = true);
                       },
-                      onLoadStop: (controller, url) {
+                      onLoadStop: (controller, url) async {
+                        final canGoBack = await controller.canGoBack();
+                        if (!mounted) return;
                         setState(() {
                           _isLoading = false;
                           _currentUrl = url.toString();
                           _urlController.text = _currentUrl;
+                          _canGoBack = canGoBack;
                         });
                       },
                       // Equivalente a AdBlockInterceptor.interceptRequest
@@ -364,6 +378,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -372,61 +387,80 @@ class _BrowserScreenState extends State<BrowserScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => _webController?.goBack(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.arrow_forward),
-            onPressed: () => _webController?.goForward(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => _webController?.reload(),
-          ),
+          _navIcon(Icons.arrow_back, () => _webController?.goBack()),
+          _navIcon(Icons.arrow_forward, () => _webController?.goForward()),
+          _navIcon(Icons.refresh, () => _webController?.reload()),
           Expanded(
             child: TextField(
               controller: _urlController,
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.go,
               decoration: const InputDecoration(
                 isDense: true,
                 border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                hintText: 'Buscar o escribir una URL',
               ),
               onSubmitted: (_) => _navigateToUrl(),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.arrow_circle_right),
-            onPressed: _navigateToUrl,
-          ),
-          IconButton(
-            tooltip: 'Bloquear anuncios',
-            icon: Icon(
-              Icons.shield,
-              color: _adblock.enabled ? Colors.green : Colors.grey,
-            ),
-            onPressed: () {
-              setState(() => _adblock.enabled = !_adblock.enabled);
+          _navIcon(Icons.arrow_circle_right, _navigateToUrl),
+          PopupMenuButton<String>(
+            tooltip: 'Más opciones',
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              switch (value) {
+                case 'adblock':
+                  setState(() => _adblock.enabled = !_adblock.enabled);
+                  break;
+                case 'download':
+                  _downloadCurrentVideo();
+                  break;
+                case 'panel':
+                  setState(() => _showDownloadPanel = !_showDownloadPanel);
+                  break;
+              }
             },
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF27AE60),
-              foregroundColor: Colors.white,
-            ),
-            icon: const Icon(Icons.download),
-            label: const Text('Descargar'),
-            onPressed: _downloadCurrentVideo,
-          ),
-          IconButton(
-            tooltip: 'Descargas',
-            icon: const Icon(Icons.list_alt),
-            onPressed: () {
-              setState(() => _showDownloadPanel = !_showDownloadPanel);
-            },
+            itemBuilder: (context) => [
+              CheckedPopupMenuItem(
+                value: 'adblock',
+                checked: _adblock.enabled,
+                child: const Text('Bloquear anuncios'),
+              ),
+              const PopupMenuItem(
+                value: 'download',
+                child: Row(
+                  children: [
+                    Icon(Icons.download, size: 20),
+                    SizedBox(width: 10),
+                    Text('Descargar video'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'panel',
+                child: Row(
+                  children: [
+                    const Icon(Icons.list_alt, size: 20),
+                    const SizedBox(width: 10),
+                    Text(_showDownloadPanel ? 'Ocultar descargas' : 'Ver descargas'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _navIcon(IconData icon, VoidCallback onPressed) {
+    return IconButton(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      constraints: const BoxConstraints(),
+      icon: Icon(icon, size: 22),
+      onPressed: onPressed,
     );
   }
 }
