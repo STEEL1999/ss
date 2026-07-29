@@ -56,6 +56,7 @@ android {
             // TODO: configurar tu propio keystore de firma para publicar.
             signingConfig = signingConfigs.debug
             minifyEnabled = false
+            shrinkResources = false
         }
     }
 }
