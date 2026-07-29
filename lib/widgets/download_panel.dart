@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/download_item.dart';
 
 /// Port de la QTableWidget de 5 columnas (Archivo, Progreso, Velocidad,
@@ -108,8 +109,79 @@ class _DownloadRow extends StatelessWidget {
                 ],
               ],
             ),
+            if (item.status == DownloadStatus.error &&
+                item.errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.errorMessage!,
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: () => _showErrorDetail(context),
+                      child: const Text('Ver detalle'),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showErrorDetail(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                item.name,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: SelectableText(
+            item.errorMessage ?? 'Sin detalles disponibles.',
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.copy, size: 18),
+            label: const Text('Copiar'),
+            onPressed: () {
+              Clipboard.setData(
+                ClipboardData(text: item.errorMessage ?? ''),
+              );
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(content: Text('Error copiado al portapapeles')),
+              );
+            },
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cerrar'),
+          ),
+        ],
       ),
     );
   }
