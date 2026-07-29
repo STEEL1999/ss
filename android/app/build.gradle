@@ -1,0 +1,69 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+    id "com.chaquo.python"
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+android {
+    namespace = "com.tuempresa.vidbrowser"
+    compileSdk = 34
+    ndkVersion = "25.2.9519653"
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17.toString()
+    }
+
+    defaultConfig {
+        applicationId = "com.tuempresa.vidbrowser"
+        // Chaquopy requiere minSdk 21+; el WebView moderno pide 21+ igual.
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0.0"
+
+        // Chaquopy REQUIERE que estas arquitecturas estén acá (no en
+        // splits.abi, que es incompatible con Chaquopy). Esto genera un
+        // único APK con soporte para ambas arquitecturas.
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a"
+        }
+
+        python {
+            pip {
+                // Mismas libs que usaba d.py
+                install "yt-dlp"
+                install "requests"
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // TODO: configurar tu propio keystore de firma para publicar.
+            signingConfig = signingConfigs.debug
+            minifyEnabled = false
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+}

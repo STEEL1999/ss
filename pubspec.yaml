@@ -1,0 +1,38 @@
+name: vidbrowser
+description: Navegador con descargador de video (port de PyQt6 a Flutter/Android)
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+
+  # WebView Chromium nativo de Android (equivalente a QWebEngineView)
+  flutter_inappwebview: ^6.0.0
+
+  # Descargas HTTP directas con soporte de pausa/reanudar (equivalente a requests.get(stream=True))
+  dio: ^5.4.0
+
+  # Permisos de almacenamiento en runtime (Android 10+)
+  permission_handler: ^11.3.0
+
+  # Ruta a carpeta de Descargas del dispositivo
+  path_provider: ^2.1.2
+
+  # Estado simple (equivalente a las señales pyqtSignal)
+  provider: ^6.1.1
+
+  # Generar IDs únicos para cada descarga
+  uuid: ^4.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
