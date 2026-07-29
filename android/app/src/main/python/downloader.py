@@ -13,18 +13,21 @@ from urllib.parse import urlparse
 import requests
 import yt_dlp
 
+# User-Agent estandarizado de Android/Chrome para evitar bloqueos 403 en móviles
+MOBILE_USER_AGENT = (
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko)"
+    " Chrome/120.0.0.0 Mobile Safari/537.36"
+)
+
 # ----------------------------------------------------------------------------
-# EXTRACTOR CUSTOM: mismo que el original
+# EXTRACTOR CUSTOM: mismo que el original pero adaptado para móvil
 # ----------------------------------------------------------------------------
 
 
 def extract_pimpbunny_com(page_url):
   headers = {
       "Referer": page_url,
-      "User-Agent": (
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-          " (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
-      ),
+      "User-Agent": MOBILE_USER_AGENT,
   }
   resp = requests.get(page_url, headers=headers, timeout=15)
   resp.raise_for_status()
@@ -75,9 +78,15 @@ def custom_extract(domain, url):
 
 def probe_info(url):
   """Equivalente a probe_opts + ydl.extract_info(download=False) +
+
   _prompt_resolution, pero devolviendo los datos para que la UI de Flutter
-  arme el selector de calidad (en vez de QInputDialog)."""
-  probe_opts = {"quiet": True, "skip_download": True}
+  arme el selector de calidad (en vez de QInputDialog).
+  """
+  probe_opts = {
+      "quiet": True,
+      "skip_download": True,
+      "http_headers": {"User-Agent": MOBILE_USER_AGENT},
+  }
   with yt_dlp.YoutubeDL(probe_opts) as ydl:
     info = ydl.extract_info(url, download=False)
 
@@ -115,12 +124,15 @@ class _DownloadState:
     self.is_cancelled = False
 
 
-def start_download(download_id, url, save_dir, title, format_chosen,
-                    progress_callback):
+def start_download(
+    download_id, url, save_dir, title, format_chosen, progress_callback
+):
   """progress_callback es un objeto Kotlin (Java interface) con métodos
+
   onProgress(percent, speed) y onFinished(success, message), pasado desde
   MainActivity.kt. Se ejecuta en el hilo que Kotlin haya elegido (idealmente
-  un background thread, no el hilo principal)."""
+  un background thread, no el hilo principal).
+  """
 
   state = _DownloadState()
   _ACTIVE[download_id] = state
@@ -155,6 +167,7 @@ def start_download(download_id, url, save_dir, title, format_chosen,
       "nocheckcertificate": True,
       "concurrent_fragment_downloads": 4,
       "buffersize": 1024 * 64,
+      "http_headers": {"User-Agent": MOBILE_USER_AGENT},
   }
 
   try:
