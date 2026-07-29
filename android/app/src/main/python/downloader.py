@@ -146,8 +146,10 @@ def start_download(download_id, url, save_dir, title, format_chosen,
   out_template = os.path.join(save_dir, "%(title)s.%(ext)s")
   ydl_opts = {
       "outtmpl": out_template,
-      "format": format_chosen or "bestvideo+bestaudio/best",
-      "merge_output_format": "mp4",
+      # "best" = un solo archivo ya combinado (audio+video). Evitamos
+      # "bestvideo+bestaudio" porque requeriría ffmpeg para unir los dos
+      # streams, y no lo empaquetamos en la app.
+      "format": format_chosen or "best",
       "quiet": True,
       "progress_hooks": [progress_hook],
       "nocheckcertificate": True,
