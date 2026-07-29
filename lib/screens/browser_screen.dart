@@ -209,9 +209,21 @@ class _BrowserScreenState extends State<BrowserScreen> {
       _showDownloadPanel = true;
     });
 
+    // Muchos servidores de video (protección anti-hotlink/CDN) devuelven
+    // 403 si el pedido no trae Referer/User-Agent de un navegador real. El
+    // WebView los manda solo; nuestra descarga por Dio no, así que los
+    // agregamos a mano acá.
+    final headers = {
+      'Referer': _currentUrl,
+      'User-Agent':
+          'Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 '
+              '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+    };
+
     service.download(
       url: url,
       title: title,
+      headers: headers,
       onProgress: (percent, speed) {
         if (!mounted) return;
         setState(() {
